@@ -1,40 +1,41 @@
 # Its own workspace root, so this repository builds on its own.
-#
-# Every module repository carries this and the template did not, which stopped
-# mattering the moment the template stopped sitting beside the estate: nested at
-# template/rust, cargo walked up, found the root workspace and refused to build.
-#
-# It would have bitten a generated repository the same way. A template that does
-# not obey the estate's rules produces repositories that start out breaking
-# them — doc/governance/rust-style.md section 4.
 [workspace]
 
 [package]
-name = "xmip-template-rust"
+name = "xmip-core-contract-toon"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/IlleNilsson/xmip-template-rust"
-description = "Starter template for a Rust Xmip module repository."
+repository = "https://github.com/IlleNilsson/xmip-core-contract-toon"
+description = "TOON content contract: Token-Oriented Object Notation, well-formed always, conforming to a bound JSON Schema when a Location names one. A xmip-core-contract technology."
 publish = false
 
 [lib]
 path = "src/lib.rs"
 
+[dependencies]
+# A Technology depends on its parent Capability, never the reverse
+# (repository-model.md). The Contract trait and its value types live there.
+contract = { package = "xmip-core-contract", git = "https://github.com/IlleNilsson/xmip-core-contract", branch = "main" }
+stream = { package = "xmip-core-stream", git = "https://github.com/IlleNilsson/xmip-core-stream", branch = "main" }
+
+# TOON is a notation for the JSON data model, and a bound schema is a JSON
+# Schema: the sibling that reads them evaluates the parsed value (ADR-0044: a
+# technology leans on the technology it is a notation of, never copies it).
+contract_json_schema = { package = "xmip-core-contract-json-schema", git = "https://github.com/IlleNilsson/xmip-core-contract-json-schema", branch = "main" }
+
+# The JSON value model the parser produces and the schema is read through —
+# the same crate the sibling's API is stated in.
+serde_json = "1"
+
+[dev-dependencies]
+xcore = { package = "xmip-core", git = "https://github.com/IlleNilsson/xmip-core", branch = "main" }
+
 [lints.rust]
-# forbid, not deny: a module has no business writing unsafe. The one exception
-# in the estate is xmip-core-abi, which holds the extern "C" vtable over
-# include/xmip_module.h and lowers this to deny with a reason at the call site.
 unsafe_code = "forbid"
 
 [lints.clippy]
-# Warned, never denied. doc/governance/rust-style.md section 3: a function
-# length gate was tried in this estate's PowerShell and produced a sixteen-entry
-# waiver list while catching nothing. The number worth reading is branches, and
-# clippy prints both.
 too_many_lines = "warn"
-
-# The ones that catch real defects rather than taste.
 pedantic = { level = "warn", priority = -1 }
 missing_errors_doc = "warn"
 missing_panics_doc = "warn"
