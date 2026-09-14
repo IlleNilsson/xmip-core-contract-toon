@@ -103,27 +103,18 @@ impl Contract for Toon {
         let instance = match parse(text) {
             Ok(instance) => instance,
             Err(malformed) => {
-                return Ok(ValidationResult {
-                    valid: false,
-                    issues: vec![ValidationIssue {
-                        code: "malformed".to_string(),
-                        message: format!("not valid TOON: {}", malformed.message),
-                        path: Some(format!(
-                            "line {} column {}",
-                            malformed.line, malformed.column
-                        )),
-                    }],
-                });
+                return Ok(ValidationResult::of(vec![ValidationIssue::at(
+                    "malformed",
+                    &format!("not valid TOON: {}", malformed.message),
+                    &format!("line {} column {}", malformed.line, malformed.column),
+                )]));
             }
         };
         let issues = match &self.schema {
             Some(bound) => schema::check(bound, bound, &instance, ""),
             None => Vec::new(),
         };
-        Ok(ValidationResult {
-            valid: issues.is_empty(),
-            issues,
-        })
+        Ok(ValidationResult::of(issues))
     }
 }
 
@@ -187,16 +178,9 @@ impl ContractFactory for ToonFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use contract::fixture::stream_as as stream;
     use serde_json::json;
     use xcore::StreamId;
-
-    fn stream(text: &str, media_type: Option<&str>) -> Stream {
-        Stream::new(
-            StreamId::new(1),
-            text.as_bytes().to_vec(),
-            media_type.map(str::to_string),
-        )
-    }
 
     fn order_schema() -> Value {
         json!({
