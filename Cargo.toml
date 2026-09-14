@@ -29,6 +29,8 @@ contract_json_schema = { package = "xmip-core-contract-json-schema", git = "http
 serde_json = "1"
 
 [dev-dependencies]
+# The parent's Stream fixture, for the tests only (ADR-0044).
+contract = { package = "xmip-core-contract", git = "https://github.com/IlleNilsson/xmip-core-contract", branch = "main", features = ["test-support"] }
 xcore = { package = "xmip-core", git = "https://github.com/IlleNilsson/xmip-core", branch = "main" }
 
 [lints.rust]
