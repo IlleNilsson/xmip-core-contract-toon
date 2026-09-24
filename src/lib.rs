@@ -14,11 +14,11 @@
 mod token;
 pub mod toon;
 
-use contract::{
+use contract_json_schema::schema;
+use sdk::contract::{
     Contract, ContractDescriptor, ContractError, ContractFactory, ContractId, ValidationIssue,
     ValidationResult,
 };
-use contract_json_schema::schema;
 use serde_json::Value;
 use stream::Stream;
 
