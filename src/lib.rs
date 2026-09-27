@@ -18,7 +18,7 @@ use contract::{
     Contract, ContractDescriptor, ContractError, ContractFactory, ContractId, ValidationIssue,
     ValidationResult,
 };
-use contract_json_schema::schema;
+use contract_json_schema::schema::Schema;
 use serde_json::Value;
 use stream::Stream;
 use xcore::settings::{Applies, Kind, Presence, Setting, Settings};
@@ -30,7 +30,7 @@ const REPRESENTATION: &str = "application/toon";
 /// The TOON contract, bare or bound to a JSON Schema.
 pub struct Toon {
     descriptor: ContractDescriptor,
-    schema: Option<Value>,
+    schema: Option<Schema>,
 }
 
 impl Toon {
@@ -43,23 +43,15 @@ impl Toon {
         }
     }
 
-    /// Well-formedness and conformance to `schema`.
+    /// Well-formedness and conformance to `schema`, compiled here, once, by
+    /// the `json-schema` contract.
     ///
     /// # Errors
     /// The schema must itself be a JSON Schema: an object or a boolean.
-    pub fn with_schema(schema: Value) -> Result<Self, ContractError> {
-        if !(schema.is_object() || schema.is_boolean()) {
-            return Err(ContractError {
-                message: "a JSON Schema is an object or a boolean".to_string(),
-            });
-        }
-        let name = schema
-            .get("$id")
-            .or_else(|| schema.get("title"))
-            .and_then(Value::as_str)
-            .unwrap_or("bound");
+    pub fn with_schema(schema: &Value) -> Result<Self, ContractError> {
+        let schema = Schema::compile(schema)?;
         Ok(Self {
-            descriptor: descriptor(&format!("toon:{name}")),
+            descriptor: descriptor(&format!("toon:{}", schema.name())),
             schema: Some(schema),
         })
     }
@@ -94,11 +86,11 @@ impl Contract for Toon {
         if let Some(media_type) = stream.media_type() {
             return Ok(is_toon_media_type(media_type));
         }
-        Ok(std::str::from_utf8(stream.bytes()).is_ok_and(looks_like_toon))
+        Ok(stream.text().is_ok_and(looks_like_toon))
     }
 
     fn validate(&self, stream: &Stream) -> Result<ValidationResult, ContractError> {
-        let text = std::str::from_utf8(stream.bytes()).map_err(|error| ContractError {
+        let text = stream.text().map_err(|error| ContractError {
             message: format!("not UTF-8 text: {error}"),
         })?;
         let instance = match parse(text) {
@@ -106,13 +98,13 @@ impl Contract for Toon {
             Err(malformed) => {
                 return Ok(ValidationResult::of(vec![ValidationIssue::at(
                     "malformed",
-                    &format!("not valid TOON: {}", malformed.message),
-                    &format!("line {} column {}", malformed.line, malformed.column),
+                    format!("not valid TOON: {}", malformed.message),
+                    format!("line {} column {}", malformed.line, malformed.column),
                 )]));
             }
         };
         let issues = match &self.schema {
-            Some(bound) => schema::check(bound, bound, &instance, ""),
+            Some(bound) => bound.check(&instance),
             None => Vec::new(),
         };
         Ok(ValidationResult::of(issues))
@@ -176,7 +168,7 @@ impl ContractFactory for ToonFactory {
         let schema = serde_json::from_slice::<Value>(&bytes).map_err(|error| ContractError {
             message: format!("schema {reference} is not valid JSON: {error}"),
         })?;
-        Ok(Box::new(Toon::with_schema(schema)?))
+        Ok(Box::new(Toon::with_schema(&schema)?))
     }
 }
 
@@ -248,7 +240,7 @@ mod tests {
 
     #[test]
     fn the_bound_contract_holds_a_conforming_order_and_names_every_departure() {
-        let bound = Toon::with_schema(order_schema()).expect("a schema");
+        let bound = Toon::with_schema(&order_schema()).expect("a schema");
         assert!(bound.is_bound());
         assert_eq!(bound.descriptor().id.0, "toon:order");
         let held = bound.validate(&stream(ORDER, None)).expect("validates");
@@ -269,7 +261,7 @@ mod tests {
         assert!(paths.contains(&"/lines/0/sku"), "{paths:?}");
         assert!(paths.contains(&"/lines/0/qty"), "{paths:?}");
         assert!(paths.contains(&"/extra"), "{paths:?}");
-        assert!(Toon::with_schema(json!("no")).is_err());
+        assert!(Toon::with_schema(&json!("no")).is_err());
     }
 
     #[test]
