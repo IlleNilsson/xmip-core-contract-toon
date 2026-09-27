@@ -21,6 +21,7 @@ use contract::{
 use contract_json_schema::schema;
 use serde_json::Value;
 use stream::Stream;
+use xcore::settings::{Applies, Kind, Presence, Setting, Settings};
 
 pub use toon::{Malformed, parse};
 
@@ -160,6 +161,10 @@ impl ContractFactory for ToonFactory {
         "toon"
     }
 
+    fn settings(&self) -> &'static Settings {
+        SETTINGS
+    }
+
     fn load(&self, reference: &str) -> Result<Box<dyn Contract>, ContractError> {
         let reference = reference.trim();
         if reference.is_empty() || reference == self.technology() {
@@ -174,6 +179,18 @@ impl ContractFactory for ToonFactory {
         Ok(Box::new(Toon::with_schema(schema)?))
     }
 }
+
+/// What a Location gives this contract (ADR-0064, amendment 2026-09-26).
+const SETTINGS: &Settings = &Settings {
+    technology: env!("CARGO_PKG_NAME"),
+    settings: &[Setting {
+        name: "reference",
+        kind: Kind::Address,
+        presence: Presence::Optional,
+        meaning: "The path of the JSON Schema documents are held to; left out, any TOON holds.",
+        applies: Applies::Both,
+    }],
+};
 
 #[cfg(test)]
 mod tests {
@@ -292,6 +309,39 @@ mod tests {
             factory
                 .load(dir.join("missing.json").to_str().expect("path"))
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn toon_declares_its_settings_and_reads_through_them() {
+        assert!(SETTINGS.problems().is_empty(), "{:?}", SETTINGS.problems());
+        let given = |name: &str, value: &str| {
+            (
+                name.to_string(),
+                xcore::settings::Given::Text(value.to_string()),
+            )
+        };
+        assert!(ToonFactory.open(Applies::Both, &[]).is_ok(), "bare");
+        let unread = ToonFactory
+            .open(
+                Applies::Receive,
+                &[given("reference", "/no/such/order.json")],
+            )
+            .err()
+            .expect("an unread file is refused");
+        assert!(
+            unread.message.contains("/no/such/order.json"),
+            "{}",
+            unread.message
+        );
+        let refused = ToonFactory
+            .open(Applies::Send, &[given("unheard_of", "x")])
+            .err()
+            .expect("an unknown setting is refused");
+        assert!(
+            refused.message.contains("unheard_of"),
+            "{}",
+            refused.message
         );
     }
 }
