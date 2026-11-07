@@ -54,8 +54,7 @@ pub(crate) fn closing_quote(text: &str) -> Option<usize> {
 /// The text of a quoted string, escapes resolved.
 pub(crate) fn unquote(quoted: &str) -> Result<String, String> {
     let inner = quoted
-        .strip_prefix('"')
-        .and_then(|rest| rest.strip_suffix('"'))
+        .strip_circumfix('"', '"')
         .ok_or_else(|| "expected a quoted string".to_string())?;
     let mut out = String::with_capacity(inner.len());
     let mut chars = inner.chars();
