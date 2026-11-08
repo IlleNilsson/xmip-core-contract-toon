@@ -184,6 +184,12 @@ impl<'a> Parser<'a, '_> {
         self.peek().filter(|line| line.depth == depth)
     }
 
+    /// Room for `count` items, one a line, but never more than the lines
+    /// left: the count is the text's to claim, not to allocate by.
+    fn room<T>(&self, count: usize) -> Vec<T> {
+        Vec::with_capacity(count.min(self.lines.len().saturating_sub(self.at)))
+    }
+
     fn document(&mut self) -> Result<Value, Malformed> {
         let Some(first) = self.peek() else {
             return Ok(Value::Object(Map::new()));
@@ -267,7 +273,7 @@ impl<'a> Parser<'a, '_> {
             if !inline.is_empty() {
                 return Err(fail(line, 0, "a table's rows go below its header"));
             }
-            let mut rows = Vec::with_capacity(header.count);
+            let mut rows = self.room(header.count);
             for _ in 0..header.count {
                 let row = self.peek_at(item_depth).ok_or_else(|| short(rows.len()))?;
                 self.at += 1;
@@ -294,7 +300,7 @@ impl<'a> Parser<'a, '_> {
             }
             return Ok(Value::Array(values));
         }
-        let mut items = Vec::with_capacity(header.count);
+        let mut items = self.room(header.count);
         for _ in 0..header.count {
             let item = self.peek_at(item_depth).ok_or_else(|| short(items.len()))?;
             self.at += 1;
@@ -351,6 +357,18 @@ impl<'a> Parser<'a, '_> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_count_past_the_lines_is_refused_without_allocating_by_it() {
+        let huge = usize::MAX / 2;
+        for text in [
+            format!("items[{huge}]:\n  - 1"),
+            format!("items[{huge}]{{id}}:\n  1"),
+        ] {
+            let refused = parse(&text).expect_err("short");
+            assert!(refused.message.contains("1 found"), "{}", refused.message);
+        }
+    }
 
     #[test]
     fn a_table_parses_to_one_object_per_row_with_the_header_fields() {
