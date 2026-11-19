@@ -47,7 +47,8 @@ impl Toon {
     /// the `json-schema` contract.
     ///
     /// # Errors
-    /// The schema must itself be a JSON Schema: an object or a boolean.
+    /// The schema must itself be a JSON Schema: an object or a boolean, whose
+    /// references end (`Schema::compile`).
     pub fn with_schema(schema: &Value) -> Result<Self, ContractError> {
         let schema = Schema::compile(schema)?;
         Ok(Self {
@@ -104,7 +105,7 @@ impl Contract for Toon {
             }
         };
         let issues = match &self.schema {
-            Some(bound) => bound.check(&instance),
+            Some(bound) => bound.check(&instance, text.len()),
             None => Vec::new(),
         };
         Ok(ValidationResult::of(issues))
