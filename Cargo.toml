@@ -34,6 +34,8 @@ serde_json = "1"
 [dev-dependencies]
 # The parent's Stream fixture, for the tests only (ADR-0044).
 contract = { package = "xmip-core-contract", git = "https://github.com/IlleNilsson/xmip-core-contract", branch = "main", features = ["test-support"] }
+# A test's own temporary folder (`file::temporary`); for the tests only.
+file = { package = "xmip-core-library-file", git = "https://github.com/IlleNilsson/xmip-core-library-file", branch = "main", features = ["test-support"] }
 
 [lints.rust]
 unsafe_code = "forbid"

@@ -290,8 +290,7 @@ mod tests {
             factory.load("toon").expect("bare").descriptor().id.0,
             "toon"
         );
-        let dir = std::env::temp_dir().join("xmip-contract-toon-test");
-        std::fs::create_dir_all(&dir).expect("temp dir");
+        let dir = file::temporary::Folder::new("contract-toon");
         let file = dir.join("order.schema.json");
         std::fs::write(&file, order_schema().to_string()).expect("write schema");
         let bound = factory.load(file.to_str().expect("path")).expect("bound");
