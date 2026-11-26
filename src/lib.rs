@@ -10,29 +10,49 @@
 //! model, so the schema is the one the `json-schema` contract reads, and that
 //! sibling evaluates it against the value [`toon`] parses; this crate owns the
 //! notation and nothing of the schema language (ADR-0044).
+//!
+//! **Built with its `declaration` feature alone** the crate is
+//! [`declaration`], what a Location naming it is configured with and the
+//! name a Validate step names it by, and none of the code above, which is
+//! behind the default feature: what the surfaces' library carries (ADR-0064,
+//! amendment 2026-11-26).
 
+#[cfg(feature = "declaration")]
+pub mod declaration;
+
+#[cfg(feature = "default")]
 mod token;
+#[cfg(feature = "default")]
 pub mod toon;
 
+#[cfg(feature = "default")]
 use contract::{
     Contract, ContractDescriptor, ContractError, ContractFactory, ContractId, ValidationIssue,
     ValidationResult,
 };
+#[cfg(feature = "default")]
 use contract_json_schema::schema::Schema;
+#[cfg(feature = "default")]
 use serde_json::Value;
+#[cfg(feature = "default")]
 use stream::Stream;
-use xcore::settings::{Applies, Kind, Presence, Setting, Settings};
+#[cfg(feature = "default")]
+use xcore::settings::Settings;
 
+#[cfg(feature = "default")]
 pub use toon::{Malformed, parse};
 
+#[cfg(feature = "default")]
 const REPRESENTATION: &str = "application/toon";
 
 /// The TOON contract, bare or bound to a JSON Schema.
+#[cfg(feature = "default")]
 pub struct Toon {
     descriptor: ContractDescriptor,
     schema: Option<Schema>,
 }
 
+#[cfg(feature = "default")]
 impl Toon {
     /// Well-formedness only.
     #[must_use]
@@ -64,12 +84,14 @@ impl Toon {
     }
 }
 
+#[cfg(feature = "default")]
 impl Default for Toon {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(feature = "default")]
 fn descriptor(id: &str) -> ContractDescriptor {
     ContractDescriptor {
         id: ContractId(id.to_string()),
@@ -78,6 +100,7 @@ fn descriptor(id: &str) -> ContractDescriptor {
     }
 }
 
+#[cfg(feature = "default")]
 impl Contract for Toon {
     fn descriptor(&self) -> &ContractDescriptor {
         &self.descriptor
@@ -112,6 +135,7 @@ impl Contract for Toon {
     }
 }
 
+#[cfg(feature = "default")]
 fn is_toon_media_type(media_type: &str) -> bool {
     let essence = media_type.split(';').next().unwrap_or("").trim();
     essence.eq_ignore_ascii_case("application/toon")
@@ -122,6 +146,7 @@ fn is_toon_media_type(media_type: &str) -> bool {
 /// The first non-blank line is an array header, `key[N]...:` or `[N]...:`,
 /// which nothing else writes. A plain `key: value` document is YAML's shape
 /// as much as TOON's and is not claimed by sniffing.
+#[cfg(feature = "default")]
 fn looks_like_toon(text: &str) -> bool {
     let Some(line) = text.lines().map(str::trim).find(|line| !line.is_empty()) else {
         return false;
@@ -147,15 +172,17 @@ fn looks_like_toon(text: &str) -> bool {
 
 /// Loads the contract a Location names: `toon` or an empty reference is the
 /// bare contract, anything else is the path of a JSON Schema file.
+#[cfg(feature = "default")]
 pub struct ToonFactory;
 
+#[cfg(feature = "default")]
 impl ContractFactory for ToonFactory {
     fn technology(&self) -> &'static str {
-        "toon"
+        declaration::NAME
     }
 
     fn settings(&self) -> &'static Settings {
-        SETTINGS
+        declaration::SETTINGS
     }
 
     fn load(&self, reference: &str) -> Result<Box<dyn Contract>, ContractError> {
@@ -172,18 +199,6 @@ impl ContractFactory for ToonFactory {
         Ok(Box::new(Toon::with_schema(&schema)?))
     }
 }
-
-/// What a Location gives this contract (ADR-0064, amendment 2026-09-26).
-const SETTINGS: &Settings = &Settings {
-    technology: env!("CARGO_PKG_NAME"),
-    settings: &[Setting {
-        name: "reference",
-        kind: Kind::Address,
-        presence: Presence::Optional,
-        meaning: "The path of the JSON Schema documents are held to; left out, any TOON holds.",
-        applies: Applies::Both,
-    }],
-};
 
 #[cfg(test)]
 mod tests {
@@ -306,6 +321,8 @@ mod tests {
 
     #[test]
     fn toon_declares_its_settings_and_reads_through_them() {
+        use declaration::SETTINGS;
+        use xcore::settings::Applies;
         assert!(SETTINGS.problems().is_empty(), "{:?}", SETTINGS.problems());
         let given = |name: &str, value: &str| {
             (
